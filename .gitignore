@@ -1,0 +1,18 @@
+.idea/
+.vscode/
+.target/
+target/
+*.class
+*.log
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local database artifacts
+*.db
+*.trace.db
+*.mv.db
+
+# Local environment files
+.env
+.env.*
