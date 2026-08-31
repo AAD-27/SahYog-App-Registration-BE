@@ -24,8 +24,8 @@ pipeline {
                 sh '''
                     docker run --rm \
                       --user "$(id -u):$(id -g)" \
-                      --volume "${WORKSPACE}:/workspace" \
-                      --workdir /workspace \
+                      --volumes-from jenkins \
+                      --workdir "${WORKSPACE}" \
                       maven:3.9-eclipse-temurin-17 \
                       mvn --batch-mode --update-snapshots clean verify
                 '''
