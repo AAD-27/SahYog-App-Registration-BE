@@ -22,6 +22,11 @@ pipeline {
     stages {
         stage('Build') {
             steps {
+                script {
+                    def shortCommit = sh(script: 'git rev-parse --short=8 HEAD', returnStdout: true).trim()
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} ${shortCommit}"
+                    currentBuild.description = "Commit ${env.GIT_COMMIT ?: shortCommit}"
+                }
                 sh '''
                     docker run --rm \
                       --user "$(id -u):$(id -g)" \
@@ -49,6 +54,43 @@ pipeline {
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Sonar Quality Gate') {
+            steps {
+                withSonarQubeEnv('SonarQubeScanner') {
+                    sh '''
+                        test "$(find src/main/java -type f -name '*.java' | wc -l)" -gt 0 || {
+                          echo "No main Java source files found; refusing an empty SonarQube analysis."
+                          exit 1
+                        }
+
+                        docker run --rm \
+                          --user "$(id -u):$(id -g)" \
+                          --volumes-from jenkins \
+                          --volume sahyog-maven-cache:/root/.m2 \
+                          --network devops-net \
+                          --workdir "${WORKSPACE}" \
+                          --env SONAR_HOST_URL="${SONAR_HOST_URL}" \
+                          --env SONAR_TOKEN="${SONAR_AUTH_TOKEN}" \
+                          maven:3.9-eclipse-temurin-17 \
+                          mvn --batch-mode org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                            -Dsonar.host.url="${SONAR_HOST_URL}" \
+                            -Dsonar.token="${SONAR_AUTH_TOKEN}" \
+                            -Dsonar.projectKey=sahyog-ar \
+                            -Dsonar.projectName="SahYog AR" \
+                            -Dsonar.maven.scanAll=false \
+                            -Dsonar.sources=src/main/java \
+                            -Dsonar.tests=src/test/java \
+                            -Dsonar.inclusions="src/main/java/**/*.java" \
+                            -Dsonar.test.inclusions="src/test/java/**/*.java" \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.java.test.binaries=target/test-classes \
+                            -Dsonar.qualitygate.wait=true \
+                            -Dsonar.qualitygate.timeout=300
+                    '''
                 }
             }
         }
