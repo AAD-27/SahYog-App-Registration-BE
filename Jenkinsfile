@@ -9,7 +9,8 @@ pipeline {
 
     triggers {
         githubPush()
-        pollSCM('H/5 * * * *')
+        // GitHub webhook is immediate; one-minute polling is the localhost fallback.
+        pollSCM('* * * * *')
     }
 
     environment {
@@ -19,15 +20,30 @@ pipeline {
     }
 
     stages {
-        stage('Build and test') {
+        stage('Build') {
             steps {
                 sh '''
                     docker run --rm \
                       --user "$(id -u):$(id -g)" \
                       --volumes-from jenkins \
+                      --volume sahyog-maven-cache:/root/.m2 \
                       --workdir "${WORKSPACE}" \
                       maven:3.9-eclipse-temurin-17 \
-                      mvn --batch-mode --update-snapshots clean verify
+                      mvn --batch-mode --update-snapshots clean compile
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      --user "$(id -u):$(id -g)" \
+                      --volumes-from jenkins \
+                      --volume sahyog-maven-cache:/root/.m2 \
+                      --workdir "${WORKSPACE}" \
+                      maven:3.9-eclipse-temurin-17 \
+                      mvn --batch-mode test
                 '''
             }
             post {
@@ -39,6 +55,15 @@ pipeline {
 
         stage('Package') {
             steps {
+                sh '''
+                    docker run --rm \
+                      --user "$(id -u):$(id -g)" \
+                      --volumes-from jenkins \
+                      --volume sahyog-maven-cache:/root/.m2 \
+                      --workdir "${WORKSPACE}" \
+                      maven:3.9-eclipse-temurin-17 \
+                      mvn --batch-mode package -DskipTests
+                '''
                 archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
             }
         }
