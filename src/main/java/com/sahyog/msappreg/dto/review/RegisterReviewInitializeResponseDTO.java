@@ -13,5 +13,6 @@ public class RegisterReviewInitializeResponseDTO {
     private ApplicantDetailsDTO applicantDetails;
     private AddressDetailsDTO addressDetails;
     private List<String> programsSelected;
+    private String applicationStatus;
     private boolean found;
 }

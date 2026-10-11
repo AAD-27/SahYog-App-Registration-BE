@@ -16,5 +16,6 @@ public class InitializeResponseDTO {
     private String mobileNumber;
     private String emailAddress;
     private String applicationDate;
+    private String applicationStatus;
     private boolean found;
 }

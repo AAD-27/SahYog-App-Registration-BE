@@ -1,5 +1,6 @@
 package com.sahyog.msappreg.dto.review;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.sahyog.msappreg.dto.person.PersonDTO;
 import lombok.Data;
 
@@ -8,6 +9,7 @@ import java.util.List;
 @Data
 public class RegisterReviewSubmitRequestDTO {
     private String pageId;
+    @JsonAlias("appOrCaseNum")
     private String applicationNum;
     private String firstName;
     private String middleName;

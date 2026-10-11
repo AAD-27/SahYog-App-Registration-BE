@@ -32,13 +32,13 @@ public class RegisterPersonServiceImpl implements RegisterPersonService {
     @Transactional(readOnly = true)
     public RegisterPersonInitializeResponseDTO initialize(RegisterPersonInitializeRequestDTO requestDTO) {
         if (requestDTO.getApplicationNum() == null || requestDTO.getApplicationNum().isBlank()) {
-            return new RegisterPersonInitializeResponseDTO(null, PAGE_ID, null, false);
+            return new RegisterPersonInitializeResponseDTO(null, PAGE_ID, null, null, false);
         }
 
         Application application = applicationRepository.findByApplicationNumber(requestDTO.getApplicationNum())
                 .orElse(null);
         if (application == null) {
-            return new RegisterPersonInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID, null, false);
+            return new RegisterPersonInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID, null, null, false);
         }
 
         RegisterPerson savedPerson = personRepository.findFirstByApplicationNumAndPersonTypeOrderByPersonIdAsc(
@@ -50,13 +50,14 @@ public class RegisterPersonServiceImpl implements RegisterPersonService {
         prefilledPerson.setMiddleName(application.getMiddleName());
         prefilledPerson.setLastName(application.getLastName());
         return new RegisterPersonInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID,
-                prefilledPerson, savedPerson != null);
+                prefilledPerson, displayStatus(application.getApplicationStatus()), savedPerson != null);
     }
 
     @Override
     @Transactional
     public RegisterPersonResponseDTO processNext(RegisterPersonRequestDTO requestDTO) {
         savePerson(requestDTO);
+        updateProgress(requestDTO.getApplicationNum(), "AR004");
         return new RegisterPersonResponseDTO(requestDTO.getApplicationNum(), "Saved");
     }
 
@@ -64,6 +65,7 @@ public class RegisterPersonServiceImpl implements RegisterPersonService {
     @Transactional
     public RegisterPersonResponseDTO processPrevious(RegisterPersonRequestDTO requestDTO) {
         savePerson(requestDTO);
+        updateProgress(requestDTO.getApplicationNum(), "AR002");
         return new RegisterPersonResponseDTO(requestDTO.getApplicationNum(), "Saved");
     }
 
@@ -122,5 +124,19 @@ public class RegisterPersonServiceImpl implements RegisterPersonService {
                 person.getLastName(), person.getDob(), person.getGender(), person.getCasteRace(),
                 person.getReligion(), person.getMaritalStatus(), person.getAadharNumber(),
                 person.getPanNumber(), person.getPassportNumber());
+    }
+
+    private void updateProgress(String applicationNum, String pageId) {
+        Application application = applicationRepository.findByApplicationNumber(applicationNum).orElseThrow();
+        application.setPageId(pageId);
+        application.setApplicationStatus("IN_PROGRESS");
+        applicationRepository.save(application);
+    }
+
+    private String displayStatus(String status) {
+        if ("REGISTERED".equalsIgnoreCase(status)) {
+            return "Registered";
+        }
+        return "COMPLETED".equalsIgnoreCase(status) ? "Completed" : "In Progress";
     }
 }

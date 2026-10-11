@@ -30,12 +30,17 @@ public class RegisterAddressServiceImpl implements RegisterAddressService {
     @Transactional(readOnly = true)
     public RegisterAddressInitializeResponseDTO initialize(RegisterAddressInitializeRequestDTO requestDTO) {
         if (requestDTO.getApplicationNum() == null || requestDTO.getApplicationNum().isBlank()) {
-            return new RegisterAddressInitializeResponseDTO(null, PAGE_ID, null, false);
+            return new RegisterAddressInitializeResponseDTO(null, PAGE_ID, null, null, false);
         }
+        var application = applicationRepository.findByApplicationNumber(requestDTO.getApplicationNum()).orElse(null);
+        if (application == null) {
+            return new RegisterAddressInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID, null, null, false);
+        }
+        String status = displayStatus(application.getApplicationStatus());
         RegisterAddress permanent = addressRepository.findFirstByApplicationNumAndAddressTypeOrderByAddressIdAsc(
                 requestDTO.getApplicationNum(), PERMANENT).orElse(null);
         if (permanent == null) {
-            return new RegisterAddressInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID, null, false);
+            return new RegisterAddressInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID, null, status, false);
         }
         RegisterAddress temporary = addressRepository.findFirstByApplicationNumAndAddressTypeOrderByAddressIdAsc(
                 requestDTO.getApplicationNum(), TEMPORARY).orElse(null);
@@ -43,13 +48,14 @@ public class RegisterAddressServiceImpl implements RegisterAddressService {
         AddressDetailsDTO temporaryDetails = temporary == null ? null : toDetails(temporary);
         boolean sameAsPermanent = temporary != null && permanentDetails.equals(temporaryDetails);
         return new RegisterAddressInitializeResponseDTO(requestDTO.getApplicationNum(), PAGE_ID,
-                new AddressDTO(permanentDetails, temporaryDetails, sameAsPermanent), true);
+                new AddressDTO(permanentDetails, temporaryDetails, sameAsPermanent), status, true);
     }
 
     @Override
     @Transactional
     public RegisterAddressResponseDTO processNext(RegisterAddressRequestDTO requestDTO) {
         saveAddresses(requestDTO);
+        updateProgress(requestDTO.getApplicationNum(), "AR003");
         return new RegisterAddressResponseDTO(requestDTO.getApplicationNum(), "Saved");
     }
 
@@ -57,6 +63,7 @@ public class RegisterAddressServiceImpl implements RegisterAddressService {
     @Transactional
     public RegisterAddressResponseDTO processPrevious(RegisterAddressRequestDTO requestDTO) {
         saveAddresses(requestDTO);
+        updateProgress(requestDTO.getApplicationNum(), "AR001");
         return new RegisterAddressResponseDTO(requestDTO.getApplicationNum(), "Saved");
     }
 
@@ -117,5 +124,19 @@ public class RegisterAddressServiceImpl implements RegisterAddressService {
     private AddressDetailsDTO toDetails(RegisterAddress address) {
         return new AddressDetailsDTO(address.getLine1(), address.getLine2(), address.getCity(),
                 address.getState(), address.getCountry(), address.getPincode());
+    }
+
+    private void updateProgress(String applicationNum, String pageId) {
+        var application = applicationRepository.findByApplicationNumber(applicationNum).orElseThrow();
+        application.setPageId(pageId);
+        application.setApplicationStatus("IN_PROGRESS");
+        applicationRepository.save(application);
+    }
+
+    private String displayStatus(String status) {
+        if ("REGISTERED".equalsIgnoreCase(status)) {
+            return "Registered";
+        }
+        return "COMPLETED".equalsIgnoreCase(status) ? "Completed" : "In Progress";
     }
 }

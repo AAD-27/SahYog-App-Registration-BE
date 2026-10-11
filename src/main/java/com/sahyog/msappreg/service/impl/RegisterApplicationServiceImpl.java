@@ -8,6 +8,9 @@ import com.sahyog.msappreg.entity.Application;
 import com.sahyog.msappreg.entity.ApplicationSequence;
 import com.sahyog.msappreg.repository.RegisterApplicationRepository;
 import com.sahyog.msappreg.repository.ApplicationSequenceRepository;
+import com.sahyog.msappreg.repository.RegisterAddressRepository;
+import com.sahyog.msappreg.repository.RegisterPersonRepository;
+import com.sahyog.msappreg.repository.RegisterProgramRepository;
 import com.sahyog.msappreg.service.RegisterApplicationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +24,9 @@ public class RegisterApplicationServiceImpl implements RegisterApplicationServic
 
     private final RegisterApplicationRepository repository;
     private final ApplicationSequenceRepository sequenceRepository;
+    private final RegisterAddressRepository addressRepository;
+    private final RegisterPersonRepository personRepository;
+    private final RegisterProgramRepository programRepository;
 
     private static final String APPLICATION_PREFIX = "A";
     private static final String SEQUENCE_ID = "APP_SEQ";
@@ -36,13 +42,14 @@ public class RegisterApplicationServiceImpl implements RegisterApplicationServic
             if (existingApp.isPresent()) {
                 Application app = existingApp.get();
                 responseDTO.setApplicationNum(app.getApplicationNumber());
-                responseDTO.setPageId(app.getPageId());
+                responseDTO.setPageId(resolveCurrentPage(app));
                 responseDTO.setFirstName(app.getFirstName());
                 responseDTO.setMiddleName(app.getMiddleName());
                 responseDTO.setLastName(app.getLastName());
                 responseDTO.setMobileNumber(app.getMobileNumber());
                 responseDTO.setEmailAddress(app.getEmailAddress());
                 responseDTO.setApplicationDate(app.getApplicationDate());
+                responseDTO.setApplicationStatus(displayStatus(app.getApplicationStatus()));
                 responseDTO.setFound(true);
                 return responseDTO;
             }
@@ -66,7 +73,7 @@ public class RegisterApplicationServiceImpl implements RegisterApplicationServic
                 .orElse(new Application());
         
         application.setApplicationNumber(applicationNumber);
-        application.setPageId(requestDTO.getPageId());
+        application.setPageId("AR002");
         application.setFirstName(requestDTO.getFirstName());
         application.setMiddleName(requestDTO.getMiddleName());
         application.setLastName(requestDTO.getLastName());
@@ -81,6 +88,36 @@ public class RegisterApplicationServiceImpl implements RegisterApplicationServic
         repository.save(application);
 
         return new NextResponseDTO(applicationNumber, "In Progress");
+    }
+
+    private String displayStatus(String status) {
+        if ("REGISTERED".equalsIgnoreCase(status)) {
+            return "Registered";
+        }
+        return "COMPLETED".equalsIgnoreCase(status) ? "Completed" : "In Progress";
+    }
+
+    private String resolveCurrentPage(Application application) {
+        if ("Completed".equals(displayStatus(application.getApplicationStatus()))) {
+            return "AR005";
+        }
+        if (application.getPageId() != null && !application.getPageId().isBlank()
+                && !"AR001".equals(application.getPageId())) {
+            return application.getPageId();
+        }
+        String applicationNum = application.getApplicationNumber();
+        if (!programRepository.findByApplicationNumOrderByProgramIdAsc(applicationNum).isEmpty()) {
+            return "AR005";
+        }
+        if (personRepository.findFirstByApplicationNumAndPersonTypeOrderByPersonIdAsc(
+                applicationNum, "Primary Applicant").isPresent()) {
+            return "AR004";
+        }
+        if (addressRepository.findFirstByApplicationNumAndAddressTypeOrderByAddressIdAsc(
+                applicationNum, "PERMANENT").isPresent()) {
+            return "AR003";
+        }
+        return "AR002";
     }
 
     /**

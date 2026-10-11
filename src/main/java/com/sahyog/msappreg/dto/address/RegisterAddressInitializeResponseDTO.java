@@ -11,5 +11,6 @@ public class RegisterAddressInitializeResponseDTO {
     private String applicationNum;
     private String pageId;
     private AddressDTO address;
+    private String applicationStatus;
     private boolean found;
 }

@@ -11,5 +11,6 @@ public class RegisterProgramInitializeResponseDTO {
     private String applicationNum;
     private String pageId;
     private List<String> programs;
+    private String applicationStatus;
     private boolean found;
 }

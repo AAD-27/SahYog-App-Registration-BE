@@ -11,5 +11,6 @@ public class RegisterPersonInitializeResponseDTO {
     private String applicationNum;
     private String pageId;
     private PersonDTO person;
+    private String applicationStatus;
     private boolean found;
 }

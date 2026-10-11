@@ -29,18 +29,24 @@ public class RegisterProgramServiceImpl implements RegisterProgramService {
     @Transactional(readOnly = true)
     public RegisterProgramInitializeResponseDTO initialize(RegisterProgramInitializeRequestDTO requestDTO) {
         if (requestDTO.getApplicationNum() == null || requestDTO.getApplicationNum().isBlank()) {
-            return new RegisterProgramInitializeResponseDTO(null, "AR004", List.of(), false);
+            return new RegisterProgramInitializeResponseDTO(null, "AR004", List.of(), null, false);
+        }
+        var application = applicationRepository.findByApplicationNumber(requestDTO.getApplicationNum()).orElse(null);
+        if (application == null) {
+            return new RegisterProgramInitializeResponseDTO(
+                    requestDTO.getApplicationNum(), "AR004", List.of(), null, false);
         }
         List<String> programs = programRepository.findByApplicationNumOrderByProgramIdAsc(requestDTO.getApplicationNum())
                 .stream().map(program -> program.getProgramCode()).toList();
         return new RegisterProgramInitializeResponseDTO(requestDTO.getApplicationNum(), "AR004", programs,
-                !programs.isEmpty());
+                displayStatus(application.getApplicationStatus()), !programs.isEmpty());
     }
 
     @Override
     @Transactional
     public RegisterProgramResponseDTO processNext(RegisterProgramRequestDTO requestDTO) {
         savePrograms(requestDTO);
+        updateProgress(requestDTO.getApplicationNum(), "AR005");
         return new RegisterProgramResponseDTO(requestDTO.getApplicationNum(), "Saved");
     }
 
@@ -48,6 +54,7 @@ public class RegisterProgramServiceImpl implements RegisterProgramService {
     @Transactional
     public RegisterProgramResponseDTO processPrevious(RegisterProgramRequestDTO requestDTO) {
         savePrograms(requestDTO);
+        updateProgress(requestDTO.getApplicationNum(), "AR003");
         return new RegisterProgramResponseDTO(requestDTO.getApplicationNum(), "Saved");
     }
 
@@ -91,5 +98,19 @@ public class RegisterProgramServiceImpl implements RegisterProgramService {
             program.setProgramName(code);
             programRepository.save(program);
         }
+    }
+
+    private void updateProgress(String applicationNum, String pageId) {
+        var application = applicationRepository.findByApplicationNumber(applicationNum).orElseThrow();
+        application.setPageId(pageId);
+        application.setApplicationStatus("IN_PROGRESS");
+        applicationRepository.save(application);
+    }
+
+    private String displayStatus(String status) {
+        if ("REGISTERED".equalsIgnoreCase(status)) {
+            return "Registered";
+        }
+        return "COMPLETED".equalsIgnoreCase(status) ? "Completed" : "In Progress";
     }
 }

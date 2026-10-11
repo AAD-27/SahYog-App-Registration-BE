@@ -33,7 +33,12 @@ public class RegisterReviewServiceImpl implements RegisterReviewService {
     public RegisterReviewInitializeResponseDTO initialize(RegisterReviewInitializeRequestDTO requestDTO) {
         String applicationNum = requestDTO.getApplicationNum();
         if (applicationNum == null || applicationNum.isBlank()) {
-            return new RegisterReviewInitializeResponseDTO(null, "AR005", null, null, List.of(), false);
+            return new RegisterReviewInitializeResponseDTO(null, "AR005", null, null, List.of(), null, false);
+        }
+        var application = applicationRepository.findByApplicationNumber(applicationNum).orElse(null);
+        if (application == null) {
+            return new RegisterReviewInitializeResponseDTO(
+                    applicationNum, "AR005", null, null, List.of(), null, false);
         }
         RegisterPerson person = personRepository.findFirstByApplicationNumAndPersonTypeOrderByPersonIdAsc(
                 applicationNum, PRIMARY_APPLICANT).orElse(null);
@@ -49,7 +54,8 @@ public class RegisterReviewServiceImpl implements RegisterReviewService {
         AddressDetailsDTO addresses = permanent == null && temporary == null ? null
                 : new AddressDetailsDTO(toAddress(permanent), toAddress(temporary));
         boolean found = person != null || permanent != null || temporary != null || !programs.isEmpty();
-        return new RegisterReviewInitializeResponseDTO(applicationNum, "AR005", applicant, addresses, programs, found);
+        return new RegisterReviewInitializeResponseDTO(applicationNum, "AR005", applicant, addresses, programs,
+                displayStatus(application.getApplicationStatus()), found);
     }
 
     @Override
@@ -74,5 +80,12 @@ public class RegisterReviewServiceImpl implements RegisterReviewService {
     private String fullName(String firstName, String middleName, String lastName) {
         return String.join(" ", List.of(firstName, middleName, lastName).stream()
                 .filter(value -> value != null && !value.isBlank()).toList());
+    }
+
+    private String displayStatus(String status) {
+        if ("REGISTERED".equalsIgnoreCase(status)) {
+            return "Registered";
+        }
+        return "COMPLETED".equalsIgnoreCase(status) ? "Completed" : "In Progress";
     }
 }
